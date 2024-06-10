@@ -1,0 +1,76 @@
+// package.json
+{
+  "name": "ext_backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "module": "commonjs",
+  "license": "MIT",
+  "scripts": {
+    "start": "ts-node server.ts"
+  },
+  "dependencies": {
+    "fastify": "^4.27.0",
+    "fastify-cors": "^6.1.0",
+    "mongodb": "^6.7.0",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "@types/fastify-cors": "^2.1.0",
+    "@types/mongodb": "^4.0.7",
+    "@types/node": "^20.14.1",
+    "ts-node": "^10.9.2"
+  }
+}
+
+// server.ts
+import { FastifyReply, FastifyRequest } from "fastify";
+
+const fastify = require('fastify')({ logger: true });
+// const cors = require('@fastify-cors'); 
+import fastifyCors from "fastify-cors"
+const { MongoClient } = require('mongodb');
+
+const MONGODB_URI = "mongodb+srv://admin:fkiptooh@cluster0.k8dhinz.mongodb.net/testDb";
+const client = new MongoClient(MONGODB_URI);
+
+// Register the CORS plugin
+fastify.register(fastifyCors, {
+    origin: "*", // You can specify specific origins instead of "*" for better security
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  });
+
+// Define a route to handle data submission
+fastify.post('/sendData', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    await client.connect();
+    const database = client.db('Cluster0');
+    const collection = database.collection('testDb');
+
+    const result = await collection.insertMany(request.body);
+
+    if (result.insertedCount > 0) {
+      reply.code(200).send('Data sent to database successfully');
+    } else {
+      reply.code(500).send('Error sending data to database: No documents inserted');
+    }
+  } catch (error) {
+    fastify.log.error('Error sending data to database:', error);
+    reply.code(500).send('Error sending data to database');
+  } finally {
+    await client.close();
+  }
+});
+
+// Start the server
+const start = async () => {
+  try {
+    await fastify.listen({ port: 3000 });
+    fastify.log.info(`Server running on port 3000`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
